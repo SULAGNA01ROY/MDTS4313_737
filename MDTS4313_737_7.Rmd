@@ -1,0 +1,416 @@
+---
+title: "MDTS4313_737_7"
+author: "SULAGNA ROY"
+date: "2026-09-10"
+output: pdf_document
+---
+# Problem Set 7 : Smoothing Splines
+# ------------------------------------
+## 1. Use the following code to simulate data on a predictor X and a response y.
+## Define the true regression function
+## def reg(x):
+## return 5 * np.sin(x) + 23 * (np.cos(x))**2
+## np.random.seed(1234) # Set seed for reproducibility
+## Generate data
+## X = np.random.uniform(5, 15, 500)
+## y = reg(X) + np.random.normal(0, 5, 500)
+## The function “reg” represents the truth (i.e., the regression function) of the
+## simulated dataset.
+
+# reg function on x:
+```{r}
+reg=function(x){5*sin(x)+23*cos(x)^2}
+```
+
+### Seed for Reproducible Outputs
+```{r}
+set.seed(1234) 
+```
+
+### 500 obs.s on predictor X from U(5,15)
+```{r}
+X=runif(500,5,15)
+```
+
+### 500 obs. on response Y (errors~N(mean=0,sd=5))
+```{r}
+Y=reg(X)+rnorm(500,0,5) 
+```
+
+# ------------------------------------
+
+## 2. Make a random train-test split of the data with test data size 20%.
+```{r}
+index=1:500
+set.seed(1234)
+sample_index=sample(index,ceiling(0.2*500))
+X.test=X[sample_index]
+Y.test=Y[sample_index]
+X.train=X[-sample_index]
+Y.train=Y[-sample_index]
+```
+
+# ------------------------------------
+
+## 3. Generate a scatter plot of the data and plot the regression function in the same graph.
+
+```{r}
+# Create a sequence of X values for a smooth regression curve 
+x.grid=seq(min(X),max(X),length.out=5000) 
+
+# Calculate the true regression function 
+y.true=reg(x.grid)
+
+# Filled circle for training 
+plot(X.train,Y.train,pch = 16,col="blue",cex=0.7,
+     xlim = range(X),ylim=range(Y),
+     xlab="X",ylab="Y",main="Training and Test Data") 
+
+# Add test observations(# Triangle for test ) 
+points(X.test,Y.test,pch=17,col="red",cex=0.7) 
+
+# Add true regression function 
+lines(x.grid,y.true,col="black",lwd = 2) 
+
+# Add legend 
+legend("topleft",
+       legend=c("Training Data","Test Data","True Regression Function"), 
+       pch=c(16,17,NA), 
+       lty=c(NA,NA,1), 
+       col=c("blue","red","black"), 
+       lwd=c(NA,NA,2),
+       cex=0.5)
+```
+# ------------------------------------
+
+## 4.Apply the smoothing spline technique to the training dataset using the B-spline
+## basis with the following values of the degrees of freedom (df): 4, 5, 10, 20, 30, 40, 50.
+## For each case, plot the fitted regression line and comment on your findings (i.e.,
+## how do the estimates change with changing df?)
+## 5. For each case, compute the training and test errors.
+```{r, fig.width=12, fig.height=10}
+## 4 & 5. B-spline fitting and Training/Test Errors
+
+library(splines)
+
+# Degrees of freedom
+df.values = c(4, 5, 10, 20, 30, 40, 50)
+
+# Sequence for plotting fitted curves
+x.grid = seq(min(X.train), max(X.train), length.out = 500)
+
+# Store training and test errors
+train.error = numeric(length(df.values))
+test.error = numeric(length(df.values))
+
+# Set plotting layout
+par(mfrow = c(4, 2))
+
+for(i in 1:length(df.values)){
+  
+  # Current degree of freedom
+  df = df.values[i]
+  
+  # Fit B-spline regression model
+  model = lm(Y.train ~ bs(X.train, df = df))
+  
+  # Predictions on training and test data
+  Y.train.pred = predict(model, newdata = data.frame(X.train = X.train))
+  Y.test.pred = predict(model, newdata = data.frame(X.train = X.test))
+  
+  # Calculate Mean Squared Errors
+  train.error[i] = mean((Y.train - Y.train.pred)^2)
+  test.error[i] = mean((Y.test - Y.test.pred)^2)
+  
+  # Predictions for smooth fitted curve
+  Y.grid.pred = predict(model, newdata = data.frame(X.train = x.grid))
+  
+  # Plot training data
+  plot(X.train, Y.train,col="blue",
+       pch = 16, cex = 0.5,
+       xlab = "X", ylab = "Y",
+       main = paste("B-spline: df =", df))
+  
+  # Add fitted regression curve
+  lines(x.grid, Y.grid.pred, lwd = 2,col="green")
+  
+  # Add true regression function
+  lines(x.grid, reg(x.grid), lwd = 2,col="black")
+  
+  legend("topright",
+         legend = c("Fitted B-spline", "True Function"),
+         col=c("green","black"),
+         lwd = 2,
+         cex = 0.5)
+}
+```
+
+# Comment on fitted Regression Lines:
+As the degrees of freedom (df) increase, the B-spline model becomes more flexible. For smaller values of df such as 4 and 5, the fitted regression curve is relatively smooth and may not capture all the variations in the data, indicating a higher bias. As df increases to 10, 20, 30, 40 and 50, the fitted curve becomes increasingly flexible and follows the observations more closely. However, for very large values of df, the curve may become excessively wiggly and start fitting random noise in the training data, indicating possible overfitting. Thus, increasing df reduces bias but can increase variance.
+
+```{r}
+# Reset plotting layout
+par(mfrow = c(1, 1))
+
+# ------------------------------------
+## Training and Test Errors for each df
+
+error.table = data.frame(
+  df = df.values,
+  Training_Error = train.error,
+  Test_Error = test.error
+)
+
+print(error.table)
+```
+
+```{r}
+# ------------------------------------
+## Plot training and test errors against df
+
+plot(df.values, train.error,
+     type = "b", pch = 16,
+     xlab = "Degrees of Freedom (df)",
+     ylab = "Mean Squared Error",
+     main = "Training and Test Errors")
+
+lines(df.values, test.error,
+      type = "b", pch = 17,
+      lty = 2)
+
+legend("topright",
+       legend = c("Training Error", "Test Error"),
+       pch = c(16, 17),
+       lty = c(1, 2))
+```
+
+# Comment on Training and Test Errors:
+
+The training error generally decreases as the degrees of freedom increase because a more flexible B-spline model can fit the training observations more closely. In contrast, the test error may initially decrease as the model becomes more flexible, but after reaching an appropriate level of flexibility, it may start to increase due to overfitting. Therefore, the model with the lowest test error provides the best predictive performance among the considered degrees of freedom. This illustrates the bias-variance trade-off: low df gives a high-bias, underfitted model, whereas very high df can give a high-variance, overfitted model.
+
+# Overall Comment :
+The best choice will be with the df=10 because it has the lowest test mse, has no chances of overfitting like its higher degrees and is simpler as of having lower degree than the 2nd best choice with df=20.
+
+# ------------------------------------
+
+## 6. Repeat the procedure 50 times. Each time, generate a fresh dataset according
+## to step 1 and make a train-test split according to step 2. Find the average of the
+## training errors and the testing errors thus obtained for each case and comment.
+
+```{r}
+# ------------------------------------
+## 6. Repeat the procedure 50 times
+
+library(splines)
+
+df.values = c(4, 5, 10, 20, 30, 40, 50)
+
+# Number of repetitions
+B = 50
+
+# Store errors for all 50 repetitions
+train.errors = matrix(0, nrow = B, ncol = length(df.values))
+test.errors = matrix(0, nrow = B, ncol = length(df.values))
+
+for(b in 1:B){
+  
+  # -----------------------------
+  # Generate a fresh dataset
+  X = runif(500, 5, 15)
+  Y = reg(X) + rnorm(500, 0, 5)
+  
+  # -----------------------------
+  # Train-test split: 80%-20%
+  index = 1:500
+  sample.index = sample(index, 100)
+  
+  X.test = X[sample.index]
+  Y.test = Y[sample.index]
+  
+  X.train = X[-sample.index]
+  Y.train = Y[-sample.index]
+  
+  # -----------------------------
+  # Fit B-spline for each df
+  for(i in 1:length(df.values)){
+    
+    df = df.values[i]
+    
+    model = lm(Y.train ~ bs(X.train, df = df))
+    
+    # Training predictions
+    Y.train.pred = predict(
+      model,
+      newdata = data.frame(X.train = X.train)
+    )
+    
+    # Test predictions
+    Y.test.pred = predict(
+      model,
+      newdata = data.frame(X.train = X.test)
+    )
+    
+    # Store MSE
+    train.errors[b, i] =
+      mean((Y.train - Y.train.pred)^2)
+    
+    test.errors[b, i] =
+      mean((Y.test - Y.test.pred)^2)
+  }
+}
+
+# ------------------------------------
+# Average errors over 50 repetitions
+
+average.train.error = colMeans(train.errors)
+average.test.error = colMeans(test.errors)
+
+# Create final table
+average.error.table = data.frame(
+  df = df.values,
+  Average_Training_Error = average.train.error,
+  Average_Test_Error = average.test.error
+)
+
+print(average.error.table)
+```
+```{r}
+# ------------------------------------
+## Plot average training and test errors
+
+plot(df.values, average.train.error,
+     type = "b",
+     pch = 16,
+     xlab = "Degrees of Freedom (df)",
+     ylab = "Average MSE",
+     main = "Average Training and Test Errors")
+
+lines(df.values, average.test.error,
+      type = "b",
+      pch = 17,
+      lty = 2)
+
+legend("topright",
+       legend = c("Average Training Error",
+                  "Average Test Error"),
+       pch = c(16, 17),
+       lty = c(1, 2))
+```
+
+# Comment:
+
+As df increases, the training error generally decreases because the B-spline becomes more flexible. The test error usually decreases initially and may increase at higher df due to overfitting. Therefore, the df having the lowest average test error over the 50 repetitions is the preferred choice, i.e. with df=10.
+
+# ------------------------------------
+
+## 7. Consider the “Boston” dataset and let the variable “medv” be the response
+## (Y) and the variable “lstat” be the predictor (X). Use a k-fold cross-validation
+## method to find the best choice of degrees of freedom for applying the smoothing
+## spline technique.
+
+```{r}
+# ------------------------------------
+## 7. Boston Dataset - K-fold Cross Validation
+
+library(MASS)
+library(splines)
+
+# Load Boston dataset
+data(Boston)
+
+# Response and predictor
+X = Boston$lstat
+Y = Boston$medv
+
+# Degrees of freedom to be considered
+df.values = c(4, 5, 10, 20, 30, 40, 50)
+
+# Number of folds
+K = 10
+
+# Set seed for reproducibility
+set.seed(1234)
+
+# Randomly divide observations into 10 folds
+n = length(Y)
+folds = sample(rep(1:K, length.out = n))
+
+# Store cross-validation errors
+CV.error = numeric(length(df.values))
+
+# ------------------------------------
+# K-fold Cross Validation
+
+for(i in 1:length(df.values)){
+  
+  df = df.values[i]
+  
+  fold.error = numeric(K)
+  
+  for(k in 1:K){
+    
+    # Training data
+    X.train = X[folds != k]
+    Y.train = Y[folds != k]
+    
+    # Test/validation data
+    X.test = X[folds == k]
+    Y.test = Y[folds == k]
+    
+    # Fit B-spline model
+    model = lm(Y.train ~ bs(X.train, df = df))
+    
+    # Prediction
+    Y.pred = predict(
+      model,
+      newdata = data.frame(X.train = X.test)
+    )
+    
+    # MSE for this fold
+    fold.error[k] = mean((Y.test - Y.pred)^2)
+  }
+  
+  # Average MSE over 10 folds
+  CV.error[i] = mean(fold.error)
+}
+
+# ------------------------------------
+# CV Error Table
+
+CV.table = data.frame(
+  df = df.values,
+  CV_Error = CV.error
+)
+
+print(CV.table)
+
+# Best df
+best.df = df.values[which.min(CV.error)]
+
+cat("Best df =", best.df, "\n")
+cat("Minimum CV Error =", min(CV.error), "\n")
+```
+```{r}
+# ------------------------------------
+## Plot Cross-Validation Error
+
+plot(df.values, CV.error,
+     type = "b",
+     pch = 16,
+     xlab = "Degrees of Freedom (df)",
+     ylab = "10-fold CV Error",
+     main = "Cross-Validation Error vs Degrees of Freedom")
+
+abline(v = best.df, lty = 2)
+
+text(best.df, min(CV.error),
+     labels = paste("Best df =", best.df),
+     pos = 4)
+```
+
+# Comment:
+
+Using 10-fold cross-validation, the optimal degrees of freedom is selected as the value of df that gives the minimum cross-validation error. This df provides the best balance between model flexibility and overfitting for predicting medv from lstat, i.e.by df=4.
+
+# ------------------------------------
+
